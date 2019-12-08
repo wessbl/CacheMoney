@@ -34,5 +34,83 @@ namespace CacheMoney
                 Console.WriteLine(i + "|1|01100|X Bytes");
             Console.Read();
         }
+
+        /// <summary>
+        /// Represents a Fully-Associative cache
+        /// </summary>
+        public class FullyAssoc
+        {
+            // Create a table with rows for bits: |Valid|Tag|LRU|Data|
+            private int[,] table;
+            private int rows;
+            private int blockSize;
+            private int lru_ciel;
+            private bool allFull;
+
+            /// <summary>
+            /// Constructor
+            /// </summary>
+            /// <param name="rows"></param>
+            public FullyAssoc(int rows, int blockSize)
+            {
+                // Instantiate state variables
+                table = new int[4,rows]; // 4 Columns X # of Rows
+                this.rows = rows;
+                this.blockSize = blockSize;
+                lru_ciel = (int)Math.Log(rows, 2);
+                allFull = false;
+
+                // Set valid bits = 0
+                for (int i = 0; i < rows; i++)
+                    table[0,i] = 0;
+            }
+
+            public void Access(string s)
+            {
+
+            }
+
+            private void AddEntry(int tag)
+            {
+                int row = 0;
+                //  If we haven't used all the rows, just use an empty row
+                if (!allFull)
+                {
+                    for (int i = 0; i < rows; i++)
+                        if (table[0,i] == 0)
+                            row = i;
+                }
+
+                // Otherwise, take the first row with LRU of 0
+                else
+                {
+                    for (int i = 0; i < rows; i++)
+                        if (table[2,i] == 0)
+                            row = i;
+                }
+
+                //  Set the row
+                table[0,row] = 1;
+                table[1,row] = tag;
+                table[2,row] = lru_ciel + 1;
+                table[3,row] = blockSize;
+            }
+        }
+
+        /// <summary>
+        /// Represents a Direct-Mapped cache
+        /// </summary>
+        public class DirectMapped
+        {
+
+        }
+
+        /// <summary>
+        /// Represents an n-Set Fully-Associative cache
+        /// </summary>
+        public class SetAssoc
+        {
+
+        }
     }
 }
