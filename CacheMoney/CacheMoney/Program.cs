@@ -15,6 +15,9 @@ namespace CacheMoney
         /// <param name="args"></param>
         static void Main(string[] args)
         {
+            int[] instruction_set = { 4, 8, 12, 16, 20, 32, 36, 40, 44, 20, 32, 36, 40, 44, 64, 68,
+                4, 8, 12, 92, 96, 100, 104, 108, 112, 100, 112, 116, 120, 128, 140, 144 };
+
             DisplayCache();
         }
 
@@ -35,15 +38,48 @@ namespace CacheMoney
             Console.Read();
         }
 
+        public abstract class Cache
+        {
+            protected int[,] table;
+            protected int rows;
+            protected int blockSize;
+
+            protected Cache(int rows, int blockSize)
+            {
+                // Instantiate state variables
+                table = new int[4, rows]; // |Valid|Tag|LRU|Data|
+                this.rows = rows;
+                this.blockSize = blockSize;
+
+                // Set valid bits = 0
+                for (int i = 0; i < rows; i++)
+                    table[0, i] = 0;
+            }
+
+            /// <summary>
+            /// Tries to access given tag, reporting if it was already in the cache (hit/miss)
+            /// </summary>
+            /// <param name="tag"></param>
+            /// <returns></returns>
+            public bool Access(int tag)
+            {
+                for (int i = 0; i < rows; i++)
+                    if (table[0, i] == 1 && table[1, i] == tag) // must be valid & tag match
+                        return true;
+
+                AddEntry(tag);
+                return false;
+            }
+
+            protected abstract void AddEntry(int tag);
+        }
+
         /// <summary>
         /// Represents a Fully-Associative cache
         /// </summary>
-        public class FullyAssoc
+        public class FullyAssoc : Cache 
         {
-            // Create a table with rows for bits: |Valid|Tag|LRU|Data|
-            private int[,] table;
-            private int rows;
-            private int blockSize;
+            // Create a table with rows for bits: 
             private int lru_ciel;
             private bool allFull;
 
@@ -51,26 +87,18 @@ namespace CacheMoney
             /// Constructor
             /// </summary>
             /// <param name="rows"></param>
-            public FullyAssoc(int rows, int blockSize)
+            public FullyAssoc(int rows, int blockSize) : base(rows, blockSize)
             {
                 // Instantiate state variables
-                table = new int[4,rows]; // 4 Columns X # of Rows
-                this.rows = rows;
-                this.blockSize = blockSize;
                 lru_ciel = (int)Math.Log(rows, 2);
                 allFull = false;
-
-                // Set valid bits = 0
-                for (int i = 0; i < rows; i++)
-                    table[0,i] = 0;
             }
 
-            public void Access(string s)
-            {
-
-            }
-
-            private void AddEntry(int tag)
+            /// <summary>
+            /// Adds a new entry in the cache
+            /// </summary>
+            /// <param name="tag"></param>
+            protected override void AddEntry(int tag)
             {
                 int row = 0;
                 //  If we haven't used all the rows, just use an empty row
@@ -79,6 +107,10 @@ namespace CacheMoney
                     for (int i = 0; i < rows; i++)
                         if (table[0,i] == 0)
                             row = i;
+
+                    // Check if we're all full
+                    if (row == rows - 1)
+                        allFull = true;
                 }
 
                 // Otherwise, take the first row with LRU of 0
@@ -94,6 +126,11 @@ namespace CacheMoney
                 table[1,row] = tag;
                 table[2,row] = lru_ciel + 1;
                 table[3,row] = blockSize;
+
+                //  Decrement all LRUs
+                for (int i = 0; i < rows; i++)
+                    if (table[2, i] > 0)
+                        table[2, i] -= 1;
             }
         }
 
