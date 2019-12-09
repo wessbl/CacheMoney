@@ -15,35 +15,190 @@ namespace CacheMoney
         /// <param name="args"></param>
         static void Main(string[] args)
         {
-            for (int i = 1; i < 100; i++)
-            {
-                //  Get the row #
-                int row = (int)(i / Math.Pow(2, 3));
-                row = row % (int)Math.Pow(2, 3);
-                Console.WriteLine(i + ": " + row);
-            }
-
             int[] instruction_set = { 4, 8, 12, 16, 20, 32, 36, 40, 44, 20, 32, 36, 40, 44, 64, 68,
                 4, 8, 12, 92, 96, 100, 104, 108, 112, 100, 112, 116, 120, 128, 140, 144 };
 
-            //DisplayCache();
+            //  Instantiate each cache type
+            FullyAssoc fa = new FullyAssoc(4, 6);
+            int FA_bit = FA_Bits(4);
+
+            DirectMapped dm = new DirectMapped(4, 6);
+            int DM_bit = DM_Bits(4);
+
+            SetAssoc sa = new SetAssoc(2, 2, 6);
+            int SA_bit = SA_Bits(2, 2);
+
+            // Cycle trackers
+            int FA_Cycles = 0;
+            int DM_Cycles = 0;
+            int SA_Cycles = 0;
+
+            //  H/M Trackers
+            int FA_tally = 0;
+            int DM_tally = 0;
+            int SA_tally = 0;
+
+            //  H/M Arrays
+            string[] FA_Hit = new string[32];
+            string[] DM_Hit = new string[32];
+            string[] SA_Hit = new string[32];
+
+            // Test each instruction twice on each cache!
+            for (int iteration = 1; iteration <=2; iteration++)
+                for (int i = 0; i < 32; i++)
+                {
+                    // FA
+                    if (fa.Access(instruction_set[i]) && iteration == 2)
+                    {
+                        FA_Hit[i] = "H";
+                        FA_tally += 1;
+                        FA_Cycles += 1;
+                    }
+                    else
+                    {
+                        FA_Hit[i] = "M";
+                        FA_Cycles += 17;
+                    }
+
+                    //DM
+                    if (dm.Access(instruction_set[i]) && iteration == 2)
+                    {
+                        DM_Cycles += 1;
+                        DM_Hit[i] = "H";
+                        DM_tally += 1;
+                    }
+                    else
+                    {
+                        DM_Cycles += 17;
+                        DM_Hit[i] = "M";
+                    }
+
+                    //SA
+                    if (sa.Access(instruction_set[i]) && iteration == 2)
+                    {
+                        SA_Cycles += 1;
+                        SA_Hit[i] = "H";
+                        SA_tally += 1;
+                    }
+                    else
+                    {
+                        SA_Cycles += 17;
+                        SA_Hit[i] = "M";
+                    }
+                }
+
+
+            //  Display FA
+            Console.WriteLine("Fully-Associative Cache: 6 Byte Blocks, 4 Rows");
+            Console.WriteLine("Cache size: " + FA_bit);
+            Console.WriteLine("Cache miss time: 1 cycle + 10 cycle penalty + 6 Byte Blocks per cycle = 17 cycles");
+            Console.WriteLine(FA_tally+" hits, "+(32-FA_tally)+" misses.");
+            Console.WriteLine("Avg CPI = " + FA_Cycles);
+            Console.WriteLine("Valid|Tag|LRU");
+            fa.PrintData();
+            Console.WriteLine();
+
+            //  Display DM
+            Console.WriteLine("Direct-Mapped Cache: 6 Byte Blocks, 4 Rows");
+            Console.WriteLine("Cache size: " + DM_bit);
+            Console.WriteLine("Cache miss time: 1 cycle + 10 cycle penalty + 6 Byte Blocks per cycle = 17 cycles");
+            Console.WriteLine(DM_tally + " hits, " + (32 - DM_tally) + " misses.");
+            Console.WriteLine("Avg CPI = " + DM_Cycles);
+            Console.WriteLine("Valid|Tag");
+            dm.PrintData();
+            Console.WriteLine();
+
+            //  Display SA
+            Console.WriteLine("Fully-Associative Cache: 6 Byte Blocks, 4 Rows");
+            Console.WriteLine("Cache size: " + SA_bit);
+            Console.WriteLine("Cache miss time: 1 cycle + 10 cycle penalty + 6 Byte Blocks per cycle = 17 cycles");
+            Console.WriteLine(SA_tally + " hits, " + (32 - SA_tally) + " misses.");
+            Console.WriteLine("Avg CPI = " + SA_Cycles);
+            Console.WriteLine("Valid|Tag|LRU");
+            sa.PrintData();
+            Console.WriteLine();
+
             Console.Read();
         }
 
-        static void DisplayCache()
+        /// <summary>
+        /// Calculates best block size for a row
+        /// </summary>
+        /// <param name="rows"></param>
+        static int FA_Bits(int rows)
         {
-            //  Display Demo
-            Console.WriteLine("Direct-Mapped Cache: 8 Byte Blocks, 8 Rows");
-            Console.WriteLine("Cache size: X Rows * 1 Valid bit * X Tag bits * X X-byte blocks = 683 bits");
-            Console.WriteLine("16-bit address -> | 22-bit tag | 8 Rows | 2 Offset |");
-            Console.WriteLine("Cache miss time: 1 cycle + 10 cycle penalty + 8 Byte Blocks per cycle = 19 cycles");
-            Console.WriteLine("Address: |0|4|8|...");
-            Console.WriteLine("Hit/Miss: |M|H|M|...");
-            Console.WriteLine("X hits, X misses. X% hit rate.");
-            Console.WriteLine("(Avg CPI = X hits + X misses * X-cycle miss penalty) / X address lookups = X Avg CPI");
-            Console.WriteLine("Row|Valid|Tag|Data");
-            for (int i = 0; i < 3; i++)
-                Console.WriteLine(i + "|1|01100|X Bytes");
+            int max = 840;
+            int lru = (int)Math.Log(rows, 2); // Get number of bits
+            int equal, best = 0;
+            int bS = 0;
+            for (int i = 0; i < 100; i++)
+            {
+                int offsetBits = (int)Math.Log(i, 2);
+                int tagBits = 16 - offsetBits;
+                equal = rows * (1 + lru + tagBits + (8 * 4 * i));
+                if (equal < max)
+                {
+                    best = equal;
+                    bS = i;
+                }
+                else break;
+            }
+            return best;
+            Console.WriteLine(rows + " rows can have up to " + bS + " bytes optimally.");
+            Console.WriteLine((double)best * 100 / (double)max);
+        }
+
+        /// <summary>
+        /// Calculates best block size for a row
+        /// </summary>
+        /// <param name="rows"></param>
+        static int DM_Bits(int rows)
+        {
+            int max = 840;
+            int equal, save = 0;
+            int bS = 0;
+            for (int i = 0; i < 100; i++)
+            {
+                int offsetBits = (int)Math.Log(i, 2);
+                int tagBits = 16 - offsetBits;
+                equal = rows * (1 + tagBits + (8 * 4 * i));
+                if (equal < max)
+                {
+                    save = equal;
+                    bS = i;
+                }
+                else break;
+            }
+            return save;
+            Console.WriteLine(rows + " rows can have up to " + bS + " bytes optimally.");
+            Console.WriteLine((double)save * 100 / (double)max);
+        }
+
+        /// <summary>
+        /// Calculates best block size for a row
+        /// </summary>
+        /// <param name="rows"></param>
+        static int SA_Bits(int rows, int n)
+        {
+            int max = 840;
+            int lru = (int)Math.Log(rows, 2); // Get number of bits
+            int equal, best = 0;
+            int bS = 0;
+            for (int i = 0; i < 100; i++)
+            {
+                int offsetBits = (int)Math.Log(i, 2);
+                int tagBits = 16 - offsetBits;
+                equal = rows * n * (1 + lru + tagBits + (8 * 4 * i));
+                if (equal < max)
+                {
+                    best = equal;
+                    bS = i;
+                }
+                else break;
+            }
+            return best;
+            Console.WriteLine(rows + " rows can have up to " + bS + " bytes optimally.");
+            Console.WriteLine((double)best * 100 / (double)max);
         }
 
         /// <summary>
@@ -83,6 +238,7 @@ namespace CacheMoney
             /// <param name="tag"></param>
             /// <returns></returns>
             public abstract bool Access(int address);
+            public abstract void PrintData();
         }
 
         /// <summary>
@@ -90,7 +246,6 @@ namespace CacheMoney
         /// </summary>
         public class FullyAssoc : Cache 
         {
-            // Create a table with rows for bits: 
             private int lru_ciel;
             private bool allFull;
 
@@ -101,7 +256,8 @@ namespace CacheMoney
             public FullyAssoc(int num_rows, int blockSize) : base(4, num_rows, blockSize)   //  |Valid|Tag|LRU|Data|
             {
                 // Instantiate state variables
-                lru_ciel = (int)Math.Log(num_rows, 2);
+                lru_ciel = (int)Math.Log(num_rows, 2); // Get number of bits
+                lru_ciel = (int)Math.Pow(2, lru_ciel) - 1; // Get max number those bits can represent
                 allFull = false;
             }
 
@@ -152,6 +308,12 @@ namespace CacheMoney
                 return false;
             }
 
+            public override void PrintData()
+            {
+                for (int i = 0; i < num_rows; i++)
+                    Console.WriteLine(table[0, i] + "|" + table[1, i] + "|" + table[2, i]);
+            }
+
             private void ManageLRU()
             {
                 //  Decrement all LRUs
@@ -191,6 +353,12 @@ namespace CacheMoney
                 table[2, row] = blockSize;
                 return false;
             }
+
+            public override void PrintData()
+            {
+                for (int i = 0; i < num_rows; i++)
+                    Console.WriteLine(table[0, i] + "|" + table[1, i]);
+            }
         }
 
         /// <summary>
@@ -227,6 +395,15 @@ namespace CacheMoney
                 //  Lookup
                 rows.TryGetValue(row, out Cache temp);
                 return temp.Access(address);
+            }
+
+            public override void PrintData()
+            {
+                for (int i = 0; i < rows.Count; i++)
+                {
+                    Console.WriteLine("Row " + i + ":");
+                    rows[i].PrintData();
+                }
             }
         }
     }
