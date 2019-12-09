@@ -46,6 +46,9 @@ namespace CacheMoney
                 Console.WriteLine(i + "|1|01100|X Bytes");
         }
 
+        /// <summary>
+        /// An abstract class to hold regular cache values and methods
+        /// </summary>
         public abstract class Cache
         {
             protected int[,] table;
@@ -54,6 +57,12 @@ namespace CacheMoney
             protected int offsetBits;
             protected int tagBits;
 
+            /// <summary>
+            /// Instantiate class variables, set valid bit
+            /// </summary>
+            /// <param name="cols"></param>
+            /// <param name="num_rows"></param>
+            /// <param name="blockSize"></param>
             protected Cache(int cols, int num_rows, int blockSize)
             {
                 // Instantiate state variables
@@ -62,7 +71,6 @@ namespace CacheMoney
                 this.blockSize = blockSize;
                 offsetBits = (int)Math.Log(blockSize, 2);
                 tagBits = 16 - offsetBits;
-                Console.Read();
 
                 // Set valid bits = 0
                 for (int i = 0; i < num_rows; i++)
@@ -75,12 +83,6 @@ namespace CacheMoney
             /// <param name="tag"></param>
             /// <returns></returns>
             public abstract bool Access(int address);
-
-            /// <summary>
-            /// Adds an entry that doesn't already exist in the cache
-            /// </summary>
-            /// <param name="tag"></param>
-            protected abstract void AddEntry(int tag, int row);
         }
 
         /// <summary>
@@ -113,16 +115,8 @@ namespace CacheMoney
                     if (table[0, i] == 1 && table[1, i] == tag) // must be valid & tag match
                         return true;
 
-                AddEntry(tag, 0);
-                return false;
-            }
+                //  Add the entry since it's not in the cache //
 
-            /// <summary>
-            /// Adds a new entry in the cache
-            /// </summary>
-            /// <param name="tag"></param>
-            protected override void AddEntry(int tag, int not_needed)
-            {
                 int row = 0;
                 //  If we haven't used all the rows, just use an empty row
                 if (!allFull)
@@ -154,6 +148,7 @@ namespace CacheMoney
                 for (int i = 0; i < num_rows; i++)
                     if (table[2, i] > 0)
                         table[2, i] -= 1;
+                return false;
             }
         }
 
@@ -164,9 +159,9 @@ namespace CacheMoney
         {
             private int rowBits;
 
-            public DirectMapped(int rows, int blockSize) : base(3, rows, blockSize) //  |Valid|Tag|Data|
+            public DirectMapped(int num_rows, int blockSize) : base(3, num_rows, blockSize) //  |Valid|Tag|Data|
             {
-                rowBits = (int)Math.Log(rows, 2);
+                rowBits = (int)Math.Log(num_rows, 2);
                 tagBits -= rowBits;
             }
 
@@ -181,15 +176,11 @@ namespace CacheMoney
                 if (table[0, row] == 1 && table[1, row] == tag)
                     return true;
 
-                AddEntry(tag, row);
-                return false;
-            }
-
-            protected override void AddEntry(int tag, int row)
-            {
+                // Add the entry since it's not in the cache
                 table[0, row] = 1;
                 table[1, row] = tag;
                 table[2, row] = blockSize;
+                return false;
             }
         }
 
@@ -198,6 +189,7 @@ namespace CacheMoney
         /// </summary>
         public class SetAssoc : Cache
         {
+            private int rowBits;
             private Dictionary<int, Cache> rows; // One row points to a cache
 
             /// <summary>
@@ -208,19 +200,23 @@ namespace CacheMoney
             /// <param name="blockSize"></param>
             public SetAssoc(int num_rows, int blockSize) : base(0, 0, blockSize)// Row-> |Valid|Tag|LRU|Data|
             {
+                rowBits = (int)Math.Log(num_rows, 2);
+                tagBits -= rowBits;
                 rows = new Dictionary<int, Cache>();
                 for (int i = 0; i < num_rows; i++)
                     rows.Add(i, new FullyAssoc(num_rows, blockSize));
             }
 
-            public override bool Access(int tag)
+            public override bool Access(int address)
             {
-                throw new NotImplementedException();
-            }
+                //  Get the row # & tag
+                int row = (int)(address / Math.Pow(2, offsetBits));
+                row = row % (int)Math.Pow(2, rowBits);
+                int tag = address / ((int)(Math.Pow(2, rowBits + offsetBits)));
 
-            protected override void AddEntry(int tag, int row)
-            {
-                throw new NotImplementedException();
+                //  Lookup
+                rows.TryGetValue(row, out Cache temp);
+                return temp.Access(address);
             }
         }
     }
