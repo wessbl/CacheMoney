@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace CacheMoney
 {
-    class Program
+    public class Program
     {
         /// <summary>
         /// Receives a series of decimal addresses, and simulates cache entries and access as well
@@ -63,12 +63,12 @@ namespace CacheMoney
             /// <param name="cols"></param>
             /// <param name="num_rows"></param>
             /// <param name="blockSize"></param>
-            protected Cache(int cols, int num_rows, int blockSize)
+            protected Cache(int cols, int num_rows, int bS)
             {
                 // Instantiate state variables
                 table = new int[cols, num_rows];
                 this.num_rows = num_rows;
-                this.blockSize = blockSize;
+                this.blockSize = bS * 4; // 4 bytes per instruction
                 offsetBits = (int)Math.Log(blockSize, 2);
                 tagBits = 16 - offsetBits;
 
@@ -113,7 +113,11 @@ namespace CacheMoney
                 //  Find the tag in the cache
                 for (int i = 0; i < num_rows; i++)
                     if (table[0, i] == 1 && table[1, i] == tag) // must be valid & tag match
+                    {
+                        ManageLRU();
+                        table[2, i] = lru_ciel + 1;
                         return true;
+                    }
 
                 //  Add the entry since it's not in the cache //
 
@@ -144,11 +148,16 @@ namespace CacheMoney
                 table[2,row] = lru_ciel + 1;
                 table[3,row] = blockSize;
 
+                ManageLRU();
+                return false;
+            }
+
+            private void ManageLRU()
+            {
                 //  Decrement all LRUs
                 for (int i = 0; i < num_rows; i++)
                     if (table[2, i] > 0)
                         table[2, i] -= 1;
-                return false;
             }
         }
 
@@ -189,6 +198,7 @@ namespace CacheMoney
         /// </summary>
         public class SetAssoc : Cache
         {
+            private int n;
             private int rowBits;
             private Dictionary<int, Cache> rows; // One row points to a cache
 
@@ -198,13 +208,13 @@ namespace CacheMoney
             /// </summary>
             /// <param name="rows"></param>
             /// <param name="blockSize"></param>
-            public SetAssoc(int num_rows, int blockSize) : base(0, 0, blockSize)// Row-> |Valid|Tag|LRU|Data|
+            public SetAssoc(int n, int num_rows, int blockSize) : base(0, 0, blockSize)// Row-> |Valid|Tag|LRU|Data|
             {
                 rowBits = (int)Math.Log(num_rows, 2);
                 tagBits -= rowBits;
                 rows = new Dictionary<int, Cache>();
                 for (int i = 0; i < num_rows; i++)
-                    rows.Add(i, new FullyAssoc(num_rows, blockSize));
+                    rows.Add(i, new FullyAssoc(n, blockSize));
             }
 
             public override bool Access(int address)
